@@ -14,7 +14,7 @@ The library also provides:
 ## Installation
 
 ```sh
-pip install whitesands-agent-player
+pip install agent-player
 ```
 
 Python 3.11 or newer. The action log uses the standard-library `sqlite3` module. A connection to the platform uses `websockets`, which this package depends on. An offline `inline` platform does not open a socket.

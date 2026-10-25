@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/whitesands-agent-player
+      url: https://pypi.org/p/agent-player
     permissions:
       id-token: write
       contents: read
