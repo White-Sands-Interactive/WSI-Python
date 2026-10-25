@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whitesands-agent-player"
+version = "1.0.0"
+description = "Start a remote game agent from a player class. The SDK owns the MCP server; the model stays on the platform."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [{ name = "White Sands Interactive" }]
+keywords = ["whitesands", "agent", "mcp", "game"]
+dependencies = ["websockets>=13"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/White-Sands-Interactive/WSI-Python"
+Repository = "https://github.com/White-Sands-Interactive/WSI-Python"
+Issues = "https://github.com/White-Sands-Interactive/WSI-Python/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"whitesands.agent_player" = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
