@@ -1,6 +1,5 @@
 """Wire protocol between AgentServer and the platform. Version 1.
 
-The platform's copy is internal/protocol in White-Sands-Interactive/Platform.
 The Node and C# SDKs speak this same version. A change to the wire format has
 to land in every copy. Game code uses AgentServer and does not import this module.
 """
@@ -11,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 PROTOCOL_VERSION = 1
-SDK_VERSION = "1.0.0"
+SDK_VERSION = "1.1.0"
 
 # How long a disconnected session can be resumed. Shared by both sides.
 SESSION_RESUME_GRACE_MS = 30_000
@@ -19,7 +18,7 @@ SESSION_RESUME_GRACE_MS = 30_000
 # MCP revision echoed during initialize. Matches the platform client.
 MCP_PROTOCOL_VERSION = "2025-06-18"
 
-DEFAULT_PLATFORM_URL = "ws://127.0.0.1:8787"
+PLATFORM_URL = "wss://api.whitesandsint.com"
 
 SEE_DESCRIPTION = (
     "Read the current game view for this player. Prefer wait, which returns this after the game grants a turn."

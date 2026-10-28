@@ -24,7 +24,8 @@ def test_maps_hello_err_codes_to_typed_errors():
 
 async def _hello_errors():
     platform = await _fake_platform({"code": "PROTOCOL", "message": "upgrade"})
-    outdated = AgentServer(platform_key="pk_test", platform_url=platform["url"], memory_path=False)
+    outdated = AgentServer(platform_key="pk_test", memory_path=False)
+    outdated._platform_url = platform["url"]
     try:
         await outdated.start(Pawn())
         raise AssertionError("expected ProtocolVersionError")
@@ -37,7 +38,8 @@ async def _hello_errors():
     await platform["close"]()
 
     platform = await _fake_platform({"code": "AUTH", "message": "bad key"})
-    unauthorized = AgentServer(platform_key="pk_wrong", platform_url=platform["url"], memory_path=False)
+    unauthorized = AgentServer(platform_key="pk_wrong", memory_path=False)
+    unauthorized._platform_url = platform["url"]
     try:
         await unauthorized.start(Pawn())
         raise AssertionError("expected PlatformAuthError")
@@ -57,10 +59,10 @@ async def _reconnects():
     events = []
     agents = AgentServer(
         platform_key="pk_test",
-        platform_url=platform["url"],
         on_event=lambda event: events.append(event.type),
         memory_path=False,
     )
+    agents._platform_url = platform["url"]
     try:
         agent = await agents.start(Pawn(), goal="Step")
         started = next(item for item in platform["received"] if item["type"] == "start_session")

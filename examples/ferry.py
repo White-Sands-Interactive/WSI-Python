@@ -115,10 +115,7 @@ async def main() -> None:
     ferry = Ferryman()
     print(render(ferry))
     if use_remote:
-        agents = AgentServer(
-            platform_key=_required("PLATFORM_KEY"),
-            platform_url=os.environ.get("PLATFORM_URL"),
-        )
+        agents = AgentServer(platform_key=_required("PLATFORM_KEY"))
     else:
         agents = AgentServer(
             inline=create_test_platform(

@@ -1,6 +1,6 @@
 # WSI Agent Player for Python
 
-The library starts a remote game agent from a player class. The game calls `start` and `turn`. The SDK publishes that class as tools. The model runs on the [platform](https://github.com/White-Sands-Interactive/Platform), so the game process never holds the model key.
+The library starts a remote game agent from a player class. The game calls `start` and `turn`. The SDK publishes that class as tools. The model runs on the platform, so the game process never holds the model key.
 
 This is the Python port of [`@whitesands/agent-player`](https://github.com/White-Sands-Interactive/WSI-Node) and `WhiteSands.AgentPlayer`. All three speak protocol version 1.
 
@@ -25,10 +25,9 @@ Set the platform key, then start one agent per character. `turn()` grants that c
 
 ```sh
 export WSI_PLATFORM_KEY=pk_...
-export WSI_PLATFORM_URL=ws://127.0.0.1:8787
 ```
 
-`WSI_PLATFORM_URL` defaults to `ws://127.0.0.1:8787` when it is unset.
+The SDK connects to `wss://api.whitesandsint.com`. That address is not read from the environment or from the command line.
 
 ```python
 from whitesands.agent_player import AgentServer
@@ -40,7 +39,7 @@ result = await ada.turn()
 # result.action, result.args, result.result, result.attempts, result.usage
 ```
 
-`AgentServer(platform_key="...", platform_url="...")` overrides the environment variables.
+`AgentServer(platform_key="...")` overrides `WSI_PLATFORM_KEY`.
 
 ### The player class
 
@@ -273,7 +272,7 @@ A standard-library logger works for `error`. `warning` is accepted in place of `
 
 ### Protocol
 
-`whitesands.agent_player.protocol` exports the wire constants and `PROTOCOL_VERSION`. The platform's copy is `internal/protocol` in [White-Sands-Interactive/Platform](https://github.com/White-Sands-Interactive/Platform). The Node SDK's copy is `src/protocol.ts`. The C# SDK's copy is `WhiteSands.AgentPlayer.Protocol`. A change to the wire format has to land in every place. Game code uses `AgentServer` and does not import the protocol.
+`whitesands.agent_player.protocol` exports the wire constants and `PROTOCOL_VERSION`. The Node SDK's copy is `src/protocol.ts`. The C# SDK's copy is `WhiteSands.AgentPlayer.Protocol`. A change to the wire format has to land in every place. Game code uses `AgentServer` and does not import the protocol.
 
 Messages on the socket use the same camelCase fields as the other SDKs (`sessionId`, `promptTokens`, `inputSchema`). The Python API uses snake_case (`session_id`, `prompt_tokens`).
 
@@ -296,12 +295,10 @@ python examples/courier.py
 python examples/ferry.py
 ```
 
-Each example replays a script. Add `--remote` to forest or ferry to use a platform that is already serving:
+Each example replays a script. Add `--remote` to forest or ferry to connect to `wss://api.whitesandsint.com`:
 
 ```sh
-./platform create-key demo
-MODEL_API_KEY=... MODEL_BASE_URL=... MODEL_NAME=... ./platform serve
 PLATFORM_KEY=pk_... python examples/forest.py --remote
 ```
 
-`./platform` is the Go server from the Platform repository. Releases are recorded in [CHANGELOG.md](CHANGELOG.md).
+Releases are recorded in [CHANGELOG.md](CHANGELOG.md).

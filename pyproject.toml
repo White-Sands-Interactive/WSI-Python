@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-player"
-version = "1.0.0"
+version = "1.1.0"
 description = "Start a remote game agent from a player class. The SDK owns the MCP server; the model stays on the platform."
 readme = "README.md"
 license = { file = "LICENSE" }

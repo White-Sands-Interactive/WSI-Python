@@ -19,7 +19,7 @@ from whitesands.agent_player.memory import SessionMemory, default_memory_path
 from whitesands.agent_player.platform_connection import PlatformConnection
 from whitesands.agent_player.protocol import (
     DEFAULT_AGENT_INSTRUCTIONS,
-    DEFAULT_PLATFORM_URL,
+    PLATFORM_URL,
     TokenUsage,
     TurnReport,
     turn_report_from_wire,
@@ -115,7 +115,6 @@ class AgentServer:
         self,
         *,
         platform_key: str | None = None,
-        platform_url: str | None = None,
         inline: Any = None,
         instructions: str | None = None,
         turn_timeout_ms: int | None = None,
@@ -129,7 +128,7 @@ class AgentServer:
                 "Set WSI_PLATFORM_KEY or pass platform_key, unless an inline platform is provided"
             )
         self._platform_key = resolved_key or "inline"
-        self._platform_url = platform_url or os.environ.get("WSI_PLATFORM_URL") or DEFAULT_PLATFORM_URL
+        self._platform_url = PLATFORM_URL
         self._inline = inline
         self._server_instructions = instructions
         self._turn_timeout_ms = turn_timeout_ms
