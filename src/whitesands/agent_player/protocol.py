@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 PROTOCOL_VERSION = 1
-SDK_VERSION = "1.1.0"
+SDK_VERSION = "1.1.1"
 
 # How long a disconnected session can be resumed. Shared by both sides.
 SESSION_RESUME_GRACE_MS = 30_000

@@ -284,6 +284,8 @@ Messages on the socket use the same camelCase fields as the other SDKs (`session
 | `examples/forest.py` | Two villagers, reflected methods |
 | `examples/courier.py` | An integer argument and a goal |
 | `examples/ferry.py` | One passenger chosen each turn |
+| `examples/tictactoe.py` | You type X. The agent plays O by calling `place` |
+| `examples/station.py` | You and the crew walk, talk, and close station faults |
 
 ```sh
 python -m venv .venv
@@ -293,12 +295,15 @@ pytest
 python examples/forest.py
 python examples/courier.py
 python examples/ferry.py
+python examples/tictactoe.py
+python examples/station.py
 ```
 
-Each example replays a script. Add `--remote` to forest or ferry to connect to `wss://api.whitesandsint.com`:
+Forest, courier, and ferry replay a script. Tic-tac-toe reads your cells from the terminal, then the agent marks O by calling `place`. Station Kite reads your orders from the terminal; the crew answers with `say` and also calls `move`, `take`, and `repair`. Add `--remote` to forest, ferry, tic-tac-toe, or station to connect to `wss://api.whitesandsint.com`:
 
 ```sh
 PLATFORM_KEY=pk_... python examples/forest.py --remote
+PLATFORM_KEY=pk_... python examples/station.py --remote
 ```
 
 Releases are recorded in [CHANGELOG.md](CHANGELOG.md).

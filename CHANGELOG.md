@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- `examples/tictactoe.py` lets you play X while the agent plays O by calling `place`.
+- `examples/station.py` is a station shift. You and the crew walk, talk, and close faults.
+
 ## 1.1.0
 
 - The SDK connects to `wss://api.whitesandsint.com`. The address is not configurable.
