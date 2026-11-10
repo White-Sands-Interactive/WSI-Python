@@ -111,6 +111,26 @@ class Villager:
 
 Argument names must match the method parameters. Keys in `args` are the names passed into the method. A missing required argument fails before the method runs. Extra keys are ignored.
 
+### Tools from data
+
+`bind_dynamic` registers one tool when the action list is data rather than methods. Call it before `start()`. `see` is allowed. `wait`, an empty name, a name that starts with `_`, and a missing callback are rejected. An empty description becomes `Action: {name}`. The same name again replaces that tool. Arguments are checked the same way as a declared method. A schema failure uses the one retry. Extra keys are ignored.
+
+```python
+from whitesands.agent_player import bind_dynamic
+
+class Counter:
+    def __init__(self):
+        self.n = 1
+        bind_dynamic(self, "see", "", {}, lambda args: {"n": self.n})
+        bind_dynamic(self, "add", "Add dx", {"dx": int}, self._add)
+
+    def _add(self, args):
+        self.n += args["dx"]
+        return {"n": self.n}
+```
+
+A dynamic `see` is enough. A dynamic action replaces a public method of the same name. A call after `start()` does not change the session already published.
+
 ### Turns
 
 `turn()` does not choose the action. It unblocks that session's `wait`. The platform reads `see()`, calls one action, and reports back.
@@ -130,6 +150,8 @@ result = await ada.turn(timeout_ms=30_000, signal=signal)
 The default timeout is 60 seconds. Pass `signal` to abort the wait. `AbortSignal` is the built-in signal: call `signal.abort()` and `turn()` raises. Any object with `aborted`, `reason`, and `add_abort_listener` works the same way.
 
 `handle.stop()` ends that session. `agents.close()`, also run by `async with`, stops every session on the server. The platform process keeps running.
+
+`agents.interrupt()` closes the platform socket and is safe to call from another thread. A `start()` blocked on the handshake or on `session_started` returns because the connection closed. Sessions stay in place, and a `turn()` waiting for a turn result keeps waiting. `close()` is still what stops the sessions.
 
 ```python
 async with AgentServer() as agents:

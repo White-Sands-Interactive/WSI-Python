@@ -1,4 +1,6 @@
-from whitesands.agent_player.reflect import parameter_names, reflect_player
+import asyncio
+
+from whitesands.agent_player.reflect import bind_dynamic, parameter_names, reflect_player
 
 
 class Sample:
@@ -101,3 +103,78 @@ def test_rejects_a_declared_action_that_is_not_a_method():
         raise AssertionError("expected a missing action to fail")
     except RuntimeError as error:
         assert "fly" in str(error)
+
+
+def test_bind_dynamic_publishes_a_callable_and_checks_its_arguments():
+    asyncio.run(_bind_dynamic())
+
+
+async def _bind_dynamic():
+    class Dynamic:
+        def __init__(self):
+            self.n = 1
+            self.seen = None
+
+            async def add(args):
+                self.seen = dict(args)
+                self.n += args["dx"]
+                return {"n": self.n}
+
+            bind_dynamic(self, "see", "", {}, lambda args: {"n": self.n})
+            bind_dynamic(self, "add", "", {"dx": int}, add)
+
+    player = Dynamic()
+    reflected = reflect_player(player)
+    assert reflected.see.name == "see"
+    assert reflected.see.description == "Action: see"
+    assert [action.name for action in reflected.actions] == ["add"]
+    assert [tool["name"] for tool in reflected.tools] == ["see", "add", "wait"]
+    add = reflected.actions[0]
+    assert add.description == "Action: add"
+    assert add.descriptor["inputSchema"]["properties"]["dx"]["type"] == "integer"
+    assert await add.invoke({"dx": 4, "extra": True}) == {"n": 5}
+    assert player.seen == {"dx": 4}
+    try:
+        await add.invoke({"dx": "no"})
+        raise AssertionError("expected a schema error")
+    except ValueError as error:
+        assert "dx" in str(error)
+
+    bind_dynamic(player, "add", "Add dx", {"dx": int}, lambda args: {"n": args["dx"]})
+    replaced = reflect_player(player)
+    assert [action.name for action in replaced.actions] == ["add"]
+    assert replaced.actions[0].description == "Add dx"
+    assert await replaced.actions[0].invoke({"dx": 2}) == {"n": 2}
+    assert reflected.actions[0].description == "Action: add"
+
+    for name, callback in (("wait", lambda args: None), ("", lambda args: None), ("_hidden", lambda args: None)):
+        try:
+            bind_dynamic(player, name, "", {}, callback)
+            raise AssertionError(f"expected {name!r} to be rejected")
+        except RuntimeError as error:
+            assert "cannot publish action" in str(error)
+    try:
+        bind_dynamic(player, "wave", "", {}, None)
+        raise AssertionError("expected a missing callback to be rejected")
+    except RuntimeError as error:
+        assert "cannot publish action" in str(error)
+
+
+def test_bind_dynamic_replaces_a_public_method():
+    class Both:
+        def see(self):
+            return {"from": "method"}
+
+        def move(self, dx):
+            del dx
+            return "method"
+
+    player = Both()
+    bind_dynamic(player, "see", "Dynamic see", {}, lambda args: {"from": "dynamic"})
+    bind_dynamic(player, "move", "Dynamic move", {"dx": int}, lambda args: "dynamic")
+    reflected = reflect_player(player)
+    assert reflected.see.description == "Dynamic see"
+    assert [action.name for action in reflected.actions] == ["move"]
+    assert reflected.actions[0].description == "Dynamic move"
+    assert asyncio.run(reflected.see.invoke({})) == {"from": "dynamic"}
+    assert asyncio.run(reflected.actions[0].invoke({"dx": 1})) == "dynamic"

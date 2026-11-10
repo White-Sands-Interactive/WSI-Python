@@ -8,6 +8,7 @@ from whitesands.agent_player import (
     TurnFailedError,
     TurnResult,
     TurnTimeoutError,
+    bind_dynamic,
 )
 from whitesands.agent_player.session_loop import SessionLoop, ToolCall
 from whitesands.agent_player.testing import create_test_platform, loop_event_to_agent_event
@@ -225,6 +226,39 @@ async def _schema_failure():
     result = await agent.turn()
     assert result.attempts == 2
     assert world.x == 2
+    await agents.close()
+
+
+def test_dynamic_schema_failure_is_a_failed_action_and_retries():
+    asyncio.run(_dynamic_schema_failure())
+
+
+async def _dynamic_schema_failure():
+    class Counter:
+        def __init__(self):
+            self.n = 1
+            bind_dynamic(self, "see", "Look", {}, lambda args: {"n": self.n})
+            bind_dynamic(self, "add", "Add dx", {"dx": int}, self._add)
+
+        def _add(self, args):
+            self.n += args["dx"]
+            return {"n": self.n}
+
+    world = Counter()
+    agents = AgentServer(
+        inline=create_test_platform(
+            [
+                {"name": "add", "arguments": {"dx": "nope"}},
+                {"name": "add", "arguments": {"dx": 4}},
+            ]
+        ),
+        memory_path=False,
+    )
+    agent = await agents.start(world)
+    result = await agent.turn()
+    assert result.attempts == 2
+    assert result.action == "add"
+    assert world.n == 5
     await agents.close()
 
 

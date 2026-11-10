@@ -5,6 +5,7 @@ game process never holds the model key.
 """
 
 from whitesands.agent_player.agent_server import AgentHandle, AgentServer, TurnResult
+from whitesands.agent_player.reflect import bind_dynamic
 from whitesands.agent_player.errors import (
     ConnectionLostError,
     PlatformAuthError,
@@ -16,7 +17,7 @@ from whitesands.agent_player.events import AgentEvent
 from whitesands.agent_player.protocol import Attempt, TokenUsage
 from whitesands.agent_player.turn_gate import AbortSignal
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 __all__ = [
     "AbortSignal",
@@ -31,4 +32,5 @@ __all__ = [
     "TurnFailedError",
     "TurnResult",
     "TurnTimeoutError",
+    "bind_dynamic",
 ]

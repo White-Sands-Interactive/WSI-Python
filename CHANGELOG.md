@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- `bind_dynamic` registers a tool from a name, description, argument schema, and callback.
+- `AgentServer.interrupt()` closes the platform socket from another thread. Sessions stay until `close()`, and an in-flight `turn()` keeps waiting.
+
 ## 1.1.1
 
 - `examples/tictactoe.py` lets you play X while the agent plays O by calling `place`.
