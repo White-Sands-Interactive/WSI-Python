@@ -1,9 +1,11 @@
 """Publish tools from a player instance.
 
-see() is required. Every other public method is an action. Names that start
-with ``_`` are skipped. A class attribute named ``agent`` supplies the
-description the model sees and the argument schemas checked before the method
-runs. A method with no entry is still a tool. Its arguments accept any JSON value.
+see() is required, or a dynamic see from bind_dynamic. Every other public
+method is an action. Names that start with ``_`` are skipped. A class
+attribute named ``agent`` supplies the description the model sees and the
+argument schemas checked before the method runs. A method with no entry is
+still a tool. Its arguments accept any JSON value. bind_dynamic registers a
+tool from data and replaces a method of the same name.
 """
 
 from __future__ import annotations
@@ -51,9 +53,52 @@ def parameter_names(fn: Any) -> list[str]:
     return names
 
 
+_DYNAMIC_TOOLS = "_wsi_dynamic_tools"
+
+
+def bind_dynamic(
+    instance: object,
+    name: str,
+    description: str,
+    args: dict[str, Any] | None,
+    callback: Callable[[dict[str, Any]], Any],
+) -> None:
+    """Register one tool from data. Call this before start().
+
+    ``see`` is allowed. ``wait``, an empty name, a name that starts with ``_``,
+    and a missing callback are rejected. An empty description becomes
+    ``Action: {name}``. Registering the same name again replaces that tool.
+    """
+    if not isinstance(name, str) or name == "" or name == "wait" or name.startswith("_"):
+        label = name if isinstance(name, str) else ""
+        raise RuntimeError(f'cannot publish action "{label}"')
+    if not callable(callback):
+        raise RuntimeError(f'cannot publish action "{name}"')
+    if not isinstance(description, str) or description == "":
+        description = f"Action: {name}"
+    if args is None:
+        specs = None
+    elif isinstance(args, dict):
+        specs = args
+    else:
+        raise RuntimeError(f'cannot publish action "{name}"')
+    tool = _build_dynamic_tool(name, description, specs, callback)
+    tools = getattr(instance, _DYNAMIC_TOOLS, None)
+    if not isinstance(tools, list):
+        tools = []
+        setattr(instance, _DYNAMIC_TOOLS, tools)
+    for index, existing in enumerate(tools):
+        if isinstance(existing, PlayerTool) and existing.name == name:
+            tools[index] = tool
+            return
+    tools.append(tool)
+
+
 def reflect_player(instance: object) -> ReflectedPlayer:
     names = _method_names(instance)
-    if "see" not in names:
+    dynamic = _dynamic_tools(instance)
+    dynamic_by_name = {tool.name: tool for tool in dynamic}
+    if "see" not in names and "see" not in dynamic_by_name:
         raise RuntimeError("Player must implement a public see() method")
 
     metadata = _read_metadata(instance)
@@ -63,14 +108,25 @@ def reflect_player(instance: object) -> ReflectedPlayer:
         if name not in names or name == "see":
             raise RuntimeError(f'Declared action "{name}" is not a public method on {class_name}')
 
-    see = _build_tool(instance, "see", SEE_DESCRIPTION, None)
+    if "see" in dynamic_by_name:
+        see = dynamic_by_name["see"]
+    else:
+        see = _build_tool(instance, "see", SEE_DESCRIPTION, None)
     actions = []
     for name in names:
         if name == "see":
             continue
+        if name in dynamic_by_name:
+            actions.append(dynamic_by_name[name])
+            continue
         spec = declared.get(name)
         description = (spec or {}).get("description") or f"Action: {name}"
         actions.append(_build_tool(instance, name, description, spec))
+    published = {action.name for action in actions}
+    for tool in dynamic:
+        if tool.name == "see" or tool.name in published:
+            continue
+        actions.append(tool)
 
     wait = {
         "name": "wait",
@@ -83,6 +139,42 @@ def reflect_player(instance: object) -> ReflectedPlayer:
         see=see,
         actions=actions,
         tools=[see.descriptor, *[action.descriptor for action in actions], wait],
+    )
+
+
+def _dynamic_tools(instance: object) -> list[PlayerTool]:
+    raw = getattr(instance, _DYNAMIC_TOOLS, None)
+    if not isinstance(raw, list):
+        return []
+    return [tool for tool in raw if isinstance(tool, PlayerTool)]
+
+
+def _build_dynamic_tool(
+    name: str,
+    description: str,
+    specs: dict[str, Any] | None,
+    callback: Callable[[dict[str, Any]], Any],
+) -> PlayerTool:
+    if isinstance(specs, dict):
+        param_names = list(specs.keys())
+    else:
+        specs = None
+        param_names = []
+    input_schema = _input_schema(param_names, specs)
+
+    async def invoke(args: dict[str, Any]) -> Any:
+        parsed = _bind(param_names, specs, args or {})
+        result = callback(parsed)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
+
+    return PlayerTool(
+        name=name,
+        description=description,
+        param_names=param_names,
+        descriptor={"name": name, "description": description, "inputSchema": input_schema},
+        invoke=invoke,
     )
 
 

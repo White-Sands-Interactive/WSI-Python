@@ -252,6 +252,18 @@ class AgentServer:
 
         return unsubscribe
 
+    def interrupt(self) -> None:
+        """Close the platform socket from any thread.
+
+        A start() blocked on the handshake or on session_started returns
+        because the connection closed. Sessions stay in place, and a turn()
+        waiting for a turn result keeps waiting. close() stops the sessions.
+        """
+        connection = self._connection
+        if connection is None:
+            return
+        connection.interrupt()
+
     async def close(self) -> None:
         """Stop every session and close the platform connection."""
         if self._closing:

@@ -1,10 +1,12 @@
 import asyncio
 import json
+import threading
 
 from whitesands.agent_player import (
     AgentServer,
     PlatformAuthError,
     ProtocolVersionError,
+    TurnFailedError,
     TurnResult,
 )
 from whitesands.agent_player.protocol import PROTOCOL_VERSION, TokenUsage
@@ -106,7 +108,113 @@ async def _reconnects():
         await platform["close"]()
 
 
-async def _fake_platform(hello_err=None):
+def test_interrupt_unblocks_a_start_waiting_for_hello():
+    asyncio.run(_interrupt_during_hello())
+
+
+async def _interrupt_during_hello():
+    platform = await _fake_platform(hold_hello=True)
+    events = []
+    agents = AgentServer(
+        platform_key="pk_test",
+        on_event=lambda event: events.append(event.type),
+        memory_path=False,
+    )
+    agents._platform_url = platform["url"]
+    started = asyncio.create_task(agents.start(Pawn()))
+    try:
+        await _wait_for(lambda: any(item.get("type") == "hello" for item in platform["received"]))
+        _interrupt(agents)
+        await _wait_for(lambda: agents._connection is not None and agents._connection._closed)
+        try:
+            await asyncio.wait_for(started, timeout=2)
+            raise AssertionError("expected start() to return")
+        except Exception as error:
+            assert _closed_error(error)
+        await asyncio.sleep(0.6)
+        assert len(platform["sockets"]) == 1
+        assert "reconnected" not in events
+        assert agents._sessions == {}
+    finally:
+        started.cancel()
+        await agents.close()
+        await platform["close"]()
+
+
+def test_interrupt_unblocks_a_start_waiting_for_session_started():
+    asyncio.run(_interrupt_during_session_start())
+
+
+async def _interrupt_during_session_start():
+    platform = await _fake_platform(hold_start=True)
+    agents = AgentServer(
+        platform_key="pk_test",
+        memory_path=False,
+    )
+    agents._platform_url = platform["url"]
+    started = asyncio.create_task(agents.start(Pawn()))
+    try:
+        await _wait_for(lambda: any(item.get("type") == "start_session" for item in platform["received"]))
+        _interrupt(agents)
+        await _wait_for(lambda: agents._connection is not None and agents._connection._closed)
+        try:
+            await asyncio.wait_for(started, timeout=2)
+            raise AssertionError("expected start() to return")
+        except RuntimeError as error:
+            assert "closed" in str(error).lower()
+        assert len(agents._sessions) == 1
+    finally:
+        started.cancel()
+        await agents.close()
+        assert agents._sessions == {}
+        await platform["close"]()
+
+
+def test_interrupt_leaves_a_waiting_turn_until_close():
+    asyncio.run(_interrupt_leaves_the_turn())
+
+
+async def _interrupt_leaves_the_turn():
+    platform = await _fake_platform()
+    agents = AgentServer(
+        platform_key="pk_test",
+        memory_path=False,
+    )
+    agents._platform_url = platform["url"]
+    agent = await agents.start(Pawn())
+    turn = asyncio.create_task(agent.turn(timeout_ms=5_000))
+    try:
+        await asyncio.sleep(0.05)
+        _interrupt(agents)
+        await _wait_for(lambda: agents._connection is not None and agents._connection._closed)
+        await asyncio.sleep(0.05)
+        assert not turn.done()
+        assert agent.session_id in agents._sessions
+        await agents.close()
+        assert agent.session_id not in agents._sessions
+        try:
+            await turn
+            raise AssertionError("expected the stopped turn to fail")
+        except TurnFailedError as error:
+            assert "session stopped" in str(error)
+    finally:
+        if not turn.done():
+            turn.cancel()
+        await agents.close()
+        await platform["close"]()
+
+
+def _interrupt(agents: AgentServer) -> None:
+    thread = threading.Thread(target=agents.interrupt)
+    thread.start()
+    thread.join()
+
+
+def _closed_error(error: BaseException) -> bool:
+    return "closed" in str(error).lower() or type(error).__name__.startswith("ConnectionClosed")
+
+
+async def _fake_platform(hello_err=None, *, hold_hello=False, hold_start=False):
     from websockets.asyncio.server import serve
 
     received = []
@@ -122,6 +230,8 @@ async def _fake_platform(hello_err=None):
                 received.append(envelope)
                 kind = envelope.get("type")
                 if kind == "hello":
+                    if hold_hello:
+                        continue
                     if hello_err:
                         await ws.send(json.dumps({"type": "hello_err", **hello_err}))
                     else:
@@ -135,6 +245,8 @@ async def _fake_platform(hello_err=None):
                             )
                         )
                 elif kind == "start_session":
+                    if hold_start:
+                        continue
                     await ws.send(json.dumps({"type": "session_started", "sessionId": envelope["sessionId"]}))
                 elif kind == "resume_session":
                     await ws.send(json.dumps({"type": "session_resumed", "sessionId": envelope["sessionId"]}))

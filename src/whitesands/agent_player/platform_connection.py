@@ -60,6 +60,7 @@ class PlatformConnection:
         self._tasks: set[asyncio.Task[Any]] = set()
         self._pending_pong: str | None = None
         self._pong = asyncio.Event()
+        self._loop = asyncio.get_running_loop()
 
     @property
     def connected(self) -> bool:
@@ -76,6 +77,8 @@ class PlatformConnection:
         return account
 
     def send(self, envelope: dict[str, Any]) -> None:
+        if self._closed:
+            raise RuntimeError("Not connected to platform")
         if self.connected:
             self._spawn(self._send_locked(envelope))
             return
@@ -83,6 +86,16 @@ class PlatformConnection:
             self._outbox.append(envelope)
             return
         raise RuntimeError("Not connected to platform")
+
+    def interrupt(self) -> None:
+        """Close the socket from any thread. Sessions and turn waits stay put."""
+        loop = self._loop
+        if loop.is_closed():
+            return
+        try:
+            loop.call_soon_threadsafe(self._abort_from_loop)
+        except RuntimeError:
+            return
 
     def begin_wait(self, session_id: str, kind: str, timeout_ms: int = 15_000) -> asyncio.Future[dict[str, Any]]:
         loop = asyncio.get_running_loop()
@@ -347,17 +360,28 @@ class PlatformConnection:
         except asyncio.CancelledError:
             return
 
+    def _abort_from_loop(self) -> None:
+        self._closed = True
+        self._reconnecting = False
+        reconnect = self._reconnect_task
+        self._reconnect_task = None
+        if reconnect is not None:
+            reconnect.cancel()
+        self._stop_heartbeat()
+        self._fail_waiters(RuntimeError("platform connection closed"))
+        _abort(self._ws)
+
     async def _send_locked(self, envelope: dict[str, Any]) -> None:
         async with self._send_lock:
             ws = self._ws
-            if not _is_open(ws):
-                if envelope.get("type") in ("mcp", "ping"):
+            if self._closed or not _is_open(ws):
+                if not self._closed and envelope.get("type") in ("mcp", "ping"):
                     self._outbox.append(envelope)
                 return
             try:
                 await ws.send(_dump(envelope))
             except Exception:
-                if envelope.get("type") in ("mcp", "ping"):
+                if not self._closed and envelope.get("type") in ("mcp", "ping"):
                     self._outbox.append(envelope)
 
     def _spawn(self, coro: Any) -> None:
