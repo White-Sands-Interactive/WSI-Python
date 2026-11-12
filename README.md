@@ -21,7 +21,7 @@ Python 3.11 or newer. The action log uses the standard-library `sqlite3` module.
 
 ## Usage
 
-Set the platform key, then start one agent per character. `turn()` grants that character one chance to act and returns what they did.
+Set the platform key, then start one agent per character. The key belongs to the game. Each `start()` also names the character with `player_id`, the UUID copied from the Players page of the web app. `turn()` grants that character one chance to act and returns what they did.
 
 ```sh
 export WSI_PLATFORM_KEY=pk_...
@@ -33,7 +33,12 @@ The SDK connects to `wss://api.whitesandsint.com`. That address is not read from
 from whitesands.agent_player import AgentServer
 
 agents = AgentServer()
-ada = await agents.start(Villager(world, "Ada"), name="Ada", goal="Stand on the tree and chop it")
+ada = await agents.start(
+    Villager(world, "Ada"),
+    name="Ada",
+    goal="Stand on the tree and chop it",
+    player_id="3f6c2d1e-8b7a-4c5d-9e0f-1a2b3c4d5e6f",
+)
 
 result = await ada.turn()
 # result.action, result.args, result.result, result.attempts, result.usage
@@ -155,7 +160,7 @@ The default timeout is 60 seconds. Pass `signal` to abort the wait. `AbortSignal
 
 ```python
 async with AgentServer() as agents:
-    ada = await agents.start(villager, name="Ada")
+    ada = await agents.start(villager, name="Ada", player_id=ada_id)
     await ada.turn()
 ```
 
@@ -183,11 +188,11 @@ except TurnFailedError as error:
 
 ### Several characters
 
-One `AgentServer` hosts every character. Each `start()` is its own session.
+One `AgentServer` hosts every character, and one platform key covers the whole game. Each `start()` is its own session and carries that character's `player_id`. The offline test platform does not require one.
 
 ```python
-ada = await agents.start(Villager(world, "Ada"), name="Ada", goal="Chop the tree")
-bea = await agents.start(Villager(world, "Bea"), name="Bea", goal="Carry wood home")
+ada = await agents.start(Villager(world, "Ada"), name="Ada", goal="Chop the tree", player_id=ada_id)
+bea = await agents.start(Villager(world, "Bea"), name="Bea", goal="Carry wood home", player_id=bea_id)
 
 await ada.turn()
 await bea.turn()
@@ -296,7 +301,7 @@ A standard-library logger works for `error`. `warning` is accepted in place of `
 
 `whitesands.agent_player.protocol` exports the wire constants and `PROTOCOL_VERSION`. The Node SDK's copy is `src/protocol.ts`. The C# SDK's copy is `WhiteSands.AgentPlayer.Protocol`. A change to the wire format has to land in every place. Game code uses `AgentServer` and does not import the protocol.
 
-Messages on the socket use the same camelCase fields as the other SDKs (`sessionId`, `promptTokens`, `inputSchema`). The Python API uses snake_case (`session_id`, `prompt_tokens`).
+Messages on the socket use the same camelCase fields as the other SDKs (`sessionId`, `playerId`, `promptTokens`, `inputSchema`). The Python API uses snake_case (`session_id`, `player_id`, `prompt_tokens`).
 
 ## This repository
 
@@ -324,8 +329,8 @@ python examples/station.py
 Forest, courier, and ferry replay a script. Tic-tac-toe reads your cells from the terminal, then the agent marks O by calling `place`. Station Kite reads your orders from the terminal; the crew answers with `say` and also calls `move`, `take`, and `repair`. Add `--remote` to forest, ferry, tic-tac-toe, or station to connect to `wss://api.whitesandsint.com`:
 
 ```sh
-PLATFORM_KEY=pk_... python examples/forest.py --remote
-PLATFORM_KEY=pk_... python examples/station.py --remote
+PLATFORM_KEY=pk_... WSI_PLAYER_ID=<ada-uuid> WSI_PLAYER_ID_2=<bea-uuid> python examples/forest.py --remote
+PLATFORM_KEY=pk_... WSI_PLAYER_ID=<character-uuid> python examples/station.py --remote
 ```
 
 Releases are recorded in [CHANGELOG.md](CHANGELOG.md).

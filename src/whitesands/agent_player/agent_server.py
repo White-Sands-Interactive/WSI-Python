@@ -6,7 +6,9 @@ it is. The platform chooses the action.
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -28,6 +30,9 @@ from whitesands.agent_player.reflect import reflect_player
 from whitesands.agent_player.turn_gate import TurnGate
 
 DEFAULT_TURN_TIMEOUT_MS = 60_000
+_CHARACTER_ID = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 EventListener = Callable[[AgentEvent], None]
 
@@ -55,6 +60,7 @@ class StartSession:
     transport: Any
     on_turn_result: Callable[[TurnReport], None]
     goal: str | None = None
+    player_id: str = ""
     logger: Any = None
     on_event: Callable[[AgentEvent], None] | None = None
     on_usage: Callable[[int], Any] | None = None
@@ -177,9 +183,16 @@ class AgentServer:
         name: str | None = None,
         goal: str | None = None,
         instructions: str | None = None,
+        player_id: str | None = None,
     ) -> AgentHandle:
-        """Reflect the player into tools, register a session, and return a handle."""
+        """Reflect the player into tools, register a session, and return a handle.
+
+        A connection to the platform uses one key for the whole game. ``player_id``
+        is the character UUID from the Players page and is required for that
+        connection. The offline test platform does not require one.
+        """
         await self.connect()
+        character_id = _require_player_id(player_id, required=self._inline is None)
         reflected = reflect_player(instance)
         session_id = str(uuid.uuid4())
         session_token = str(uuid.uuid4())
@@ -210,6 +223,7 @@ class AgentServer:
                     transport=client_transport,
                     on_turn_result=gate.complete_turn,
                     goal=goal,
+                    player_id=character_id,
                     logger=self._logger,
                     on_event=self._emit,
                 )
@@ -230,6 +244,7 @@ class AgentServer:
                 "name": player_name,
                 "tools": reflected.tools,
                 "instructions": prompt,
+                "playerId": character_id,
             }
             if goal:
                 body["goal"] = goal
@@ -415,6 +430,21 @@ class AgentServer:
             path = self._memory_path if isinstance(self._memory_path, str) else default_memory_path()
             self._memory = SessionMemory(path)
         return self._memory
+
+
+def _require_player_id(raw: str | None, *, required: bool) -> str:
+    character_id = raw.strip() if isinstance(raw, str) else ""
+    if not character_id:
+        if required:
+            raise RuntimeError("playerId is required. Copy the character ID from the web app")
+        return ""
+    if _CHARACTER_ID.fullmatch(character_id) is None:
+        raise RuntimeError(
+            "playerId "
+            + json.dumps(character_id)
+            + " is not a character ID. Copy the ID from the character in the web app"
+        )
+    return character_id
 
 
 def _join_instructions(server_instructions: str | None, start_instructions: str | None) -> str:

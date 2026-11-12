@@ -11,6 +11,8 @@ from whitesands.agent_player import (
 )
 from whitesands.agent_player.protocol import PROTOCOL_VERSION, TokenUsage
 
+PLAYER_ID = "3f6c2d1e-8b7a-4c5d-9e0f-1a2b3c4d5e6f"
+
 
 class Pawn:
     def see(self):
@@ -66,9 +68,10 @@ async def _reconnects():
     )
     agents._platform_url = platform["url"]
     try:
-        agent = await agents.start(Pawn(), goal="Step")
+        agent = await agents.start(Pawn(), goal="Step", player_id=PLAYER_ID)
         started = next(item for item in platform["received"] if item["type"] == "start_session")
         assert started["goal"] == "Step"
+        assert started["playerId"] == PLAYER_ID
 
         _abort(platform["sockets"][0])
         await _wait_for(lambda: "reconnected" in events)
@@ -79,6 +82,7 @@ async def _reconnects():
             "sessionId": started["sessionId"],
             "sessionToken": started["sessionToken"],
         } in platform["received"]
+        assert all("playerId" not in item for item in platform["received"] if item["type"] == "resume_session")
 
         turn = asyncio.create_task(agent.turn(timeout_ms=5_000))
         await asyncio.sleep(0.05)
@@ -152,7 +156,7 @@ async def _interrupt_during_session_start():
         memory_path=False,
     )
     agents._platform_url = platform["url"]
-    started = asyncio.create_task(agents.start(Pawn()))
+    started = asyncio.create_task(agents.start(Pawn(), player_id=PLAYER_ID))
     try:
         await _wait_for(lambda: any(item.get("type") == "start_session" for item in platform["received"]))
         _interrupt(agents)
@@ -170,6 +174,64 @@ async def _interrupt_during_session_start():
         await platform["close"]()
 
 
+def test_a_platform_session_requires_a_character_id():
+    asyncio.run(_requires_character_id())
+
+
+async def _requires_character_id():
+    platform = await _fake_platform()
+    missing = AgentServer(platform_key="pk_test", memory_path=False)
+    missing._platform_url = platform["url"]
+    try:
+        await missing.start(Pawn())
+        raise AssertionError("expected a missing player id to fail")
+    except RuntimeError as error:
+        assert str(error) == "playerId is required. Copy the character ID from the web app"
+    finally:
+        await missing.close()
+    assert all(item.get("type") != "start_session" for item in platform["received"])
+    await platform["close"]()
+
+    platform = await _fake_platform()
+    invalid = AgentServer(platform_key="pk_test", memory_path=False)
+    invalid._platform_url = platform["url"]
+    try:
+        await invalid.start(Pawn(), player_id="  not-a-character  ")
+        raise AssertionError("expected a non-uuid player id to fail")
+    except RuntimeError as error:
+        assert (
+            str(error)
+            == 'playerId "not-a-character" is not a character ID. Copy the ID from the character in the web app'
+        )
+    finally:
+        await invalid.close()
+    assert all(item.get("type") != "start_session" for item in platform["received"])
+    await platform["close"]()
+
+    platform = await _fake_platform()
+    agents = AgentServer(platform_key="pk_test", memory_path=False)
+    agents._platform_url = platform["url"]
+    try:
+        agent = await agents.start(Pawn(), player_id="  " + PLAYER_ID + "  ")
+        started = next(item for item in platform["received"] if item["type"] == "start_session")
+        assert started["playerId"] == PLAYER_ID
+        await agent.stop()
+    finally:
+        await agents.close()
+        await platform["close"]()
+
+    from whitesands.agent_player.testing import create_test_platform
+
+    offline = AgentServer(
+        inline=create_test_platform([{"name": "move", "arguments": {"dx": 1}}]),
+        memory_path=False,
+    )
+    agent = await offline.start(Pawn())
+    result = await agent.turn()
+    assert result.action == "move"
+    await offline.close()
+
+
 def test_interrupt_leaves_a_waiting_turn_until_close():
     asyncio.run(_interrupt_leaves_the_turn())
 
@@ -181,7 +243,7 @@ async def _interrupt_leaves_the_turn():
         memory_path=False,
     )
     agents._platform_url = platform["url"]
-    agent = await agents.start(Pawn())
+    agent = await agents.start(Pawn(), player_id=PLAYER_ID)
     turn = asyncio.create_task(agent.turn(timeout_ms=5_000))
     try:
         await asyncio.sleep(0.05)

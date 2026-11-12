@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+- A platform session requires `player_id`, the character UUID from the web app. One platform key covers every character in the game. `start_session` sends that id as `playerId`. The offline test platform does not require one.
+
 ## 1.2.0
 
 - `bind_dynamic` registers a tool from a name, description, argument schema, and callback.

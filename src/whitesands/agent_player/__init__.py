@@ -17,7 +17,7 @@ from whitesands.agent_player.events import AgentEvent
 from whitesands.agent_player.protocol import Attempt, TokenUsage
 from whitesands.agent_player.turn_gate import AbortSignal
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = [
     "AbortSignal",

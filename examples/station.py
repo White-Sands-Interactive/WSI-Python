@@ -1,7 +1,7 @@
 """Station Kite. You and the crew walk, talk, and close faults together.
 
 python examples/station.py
-Remote: PLATFORM_KEY=pk_... python examples/station.py --remote
+Remote: PLATFORM_KEY=pk_... WSI_PLAYER_ID=<character-uuid> python examples/station.py --remote
 """
 
 from __future__ import annotations
@@ -259,7 +259,12 @@ async def main() -> None:
         agents = AgentServer(platform_key=_required("PLATFORM_KEY"))
     else:
         agents = AgentServer(inline=_local_platform())
-    agent = await agents.start(crew, name="Ivo", goal=GOAL)
+    agent = await agents.start(
+        crew,
+        name="Ivo",
+        goal=GOAL,
+        player_id=_required("WSI_PLAYER_ID") if use_remote else None,
+    )
     print("Station Kite. You are the duty officer. Ivo is the mechanic.")
     print("Walk the ring, talk, and close the faults together. The reactor needs the coolant spool.")
     print("Type help for commands.")

@@ -1,7 +1,7 @@
 """Tic-tac-toe. You play X by typing a cell. The agent plays O by calling place.
 
 python examples/tictactoe.py
-Remote: PLATFORM_KEY=pk_... python examples/tictactoe.py --remote
+Remote: PLATFORM_KEY=pk_... WSI_PLAYER_ID=<character-uuid> python examples/tictactoe.py --remote
 """
 
 from __future__ import annotations
@@ -109,7 +109,12 @@ async def main() -> None:
     else:
         agents = AgentServer(inline=_local_platform())
 
-    agent = await agents.start(opponent, name="O", goal=GOAL)
+    agent = await agents.start(
+        opponent,
+        name="O",
+        goal=GOAL,
+        player_id=_required("WSI_PLAYER_ID") if use_remote else None,
+    )
     stopped = False
     show_board = False
     print("You are X. The agent is O and plays by calling place.")

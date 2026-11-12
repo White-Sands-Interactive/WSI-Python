@@ -1,6 +1,6 @@
 """River crossing. Offline by default, replaying one solution.
 
-Remote: PLATFORM_KEY=pk_... python examples/ferry.py --remote
+Remote: PLATFORM_KEY=pk_... WSI_PLAYER_ID=<character-uuid> python examples/ferry.py --remote
 """
 
 from __future__ import annotations
@@ -123,7 +123,12 @@ async def main() -> None:
             )
         )
 
-    agent = await agents.start(ferry, name="Ferryman", goal=GOAL)
+    agent = await agents.start(
+        ferry,
+        name="Ferryman",
+        goal=GOAL,
+        player_id=_required("WSI_PLAYER_ID") if use_remote else None,
+    )
     limit = 12 if use_remote else len(SOLUTION)
     turn = 1
     while turn <= limit and not ferry.see()["solved"]:

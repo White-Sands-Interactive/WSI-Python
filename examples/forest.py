@@ -1,6 +1,6 @@
 """Two villagers on a small map. Offline by default.
 
-Remote: PLATFORM_KEY=pk_... python examples/forest.py --remote
+Remote: PLATFORM_KEY=pk_... WSI_PLAYER_ID=<ada-uuid> WSI_PLAYER_ID_2=<bea-uuid> python examples/forest.py --remote
 """
 
 from __future__ import annotations
@@ -112,8 +112,15 @@ async def main() -> None:
             )
         )
 
-    ada_agent = await agents.start(ada, goal="Stand on the tree and chop it")
-    bea_agent = await agents.start(bea)
+    ada_agent = await agents.start(
+        ada,
+        goal="Stand on the tree and chop it",
+        player_id=_required("WSI_PLAYER_ID") if use_remote else None,
+    )
+    bea_agent = await agents.start(
+        bea,
+        player_id=_required("WSI_PLAYER_ID_2") if use_remote else None,
+    )
 
     moved = await ada_agent.turn()
     print(f"\nAda {moved.action}({moved.args})")

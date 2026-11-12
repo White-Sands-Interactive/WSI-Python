@@ -191,6 +191,7 @@ async def _goal():
         async def start_session(self, request):
             seen["goal"] = request.goal
             seen["instructions"] = request.instructions
+            seen["player_id"] = request.player_id
 
         async def stop_session(self, session_id):
             del session_id
@@ -199,8 +200,14 @@ async def _goal():
             return None
 
     agents = AgentServer(inline=Recording(), memory_path=False)
-    await agents.start(TinyWorld(), goal="Collect wood", instructions="Stay calm.")
+    await agents.start(
+        TinyWorld(),
+        goal="Collect wood",
+        instructions="Stay calm.",
+        player_id="3f6c2d1e-8b7a-4c5d-9e0f-1a2b3c4d5e6f",
+    )
     assert seen["goal"] == "Collect wood"
+    assert seen["player_id"] == "3f6c2d1e-8b7a-4c5d-9e0f-1a2b3c4d5e6f"
     assert "Stay calm." in seen["instructions"]
     assert "call wait first" in seen["instructions"]
     assert "done list" in seen["instructions"]
